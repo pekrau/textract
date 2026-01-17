@@ -12,7 +12,7 @@ import urllib.parse
 import requests
 import pyperclip
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 PNG_MIMETYPE = "image/png"
 JPEG_MIMETYPE = "image/jpeg"
@@ -37,16 +37,29 @@ TEXT_MIMETYPES = {
 }
 
 
-def main(locations, outfiles=False, clipboard=True, languages="sv en", gpu=True, apikey=None):
+def main(
+    locations,
+    outfiles=False,
+    clipboard=True,
+    markdown=False,
+    languages="sv en",
+    gpu=True,
+    apikey=None,
+):
     "Process the content given by the locations (URL of local filepath)."
     clipboard_result = []
     for location in locations:
         try:
             filepath, name, mimetype = get_content_mimetype(location, apikey=apikey)
             if mimetype in IMAGE_MIMETYPES:
-                text = extract_text_from_image(filepath, languages=languages.split(), gpu=gpu)
+                text = extract_text_from_image(
+                    filepath, languages=languages.split(), gpu=gpu
+                )
             elif mimetype in TEXT_MIMETYPES:
-                text = extract_text_from_textfile(filepath)
+                if markdown:
+                    text = extract_markdown_from_textfile(filepath)
+                else:
+                    text = extract_text_from_textfile(filepath)
         finally:
             filepath.unlink()
         if outfiles:
@@ -73,7 +86,9 @@ def get_content_mimetype(location, apikey=None):
         if response.status_code in (HTTP.BAD_GATEWAY, HTTP.SERVICE_UNAVAILABLE):
             raise IOError(f"invalid response: {response.status_code=}")
         elif response.status_code != HTTP.OK:
-            raise IOError(f"invalid response: {response.status_code=} {response.content=}")
+            raise IOError(
+                f"invalid response: {response.status_code=} {response.content=}"
+            )
         content = response.content
         name = Path(parts.path).stem
         mimetype = response.headers["Content-Type"]
@@ -90,14 +105,16 @@ def get_content_mimetype(location, apikey=None):
 
 
 def extract_text_from_image(filepath, languages, gpu):
-    import easyocr
+    import easyocr  # Lazy import, to reduce startup time.
+
     reader = easyocr.Reader(languages, gpu=gpu)
     text = reader.readtext(str(filepath), detail=0)
     return "\n".join(text)
 
 
 def extract_text_from_textfile(filepath):
-    import pymupdf
+    import pymupdf  # Lazy import, to reduce startup time.
+
     text = []
     doc = pymupdf.open(str(filepath))
     for page in doc:
@@ -107,7 +124,8 @@ def extract_text_from_textfile(filepath):
 
 
 def extract_markdown_from_textfile(filepath):
-    import pymupdf4llm
+    import pymupdf4llm  # Lazy import, to reduce startup time.
+
     return pymupdf4llm.to_markdown(str(filepath))
 
 
@@ -120,19 +138,37 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         prog="textract",
-        description=f"Extract text from image or text files. Version {VERSION}")
+        description=f"Extract text from image or text files. Version {VERSION}",
+    )
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("-o", "--outfiles", action="store_true",
-                        help="Store results in files with same name but '.txt'.")
-    group.add_argument("-c", "--clipboard", action="store_true",
-                        help="Copy result to the clipboard.")
-    parser.add_argument("-l", "--languages", default="sv en",
-                        help="String containing languages to use.")
-    parser.add_argument("-g", "--gpu", action="store_true",
-                        help="Use GPU if present.")
-    parser.add_argument("-a", "--apikey", default=os.environ.get("APIKEY"),
-                        help="API key to use for URLs.")
-    parser.add_argument("locations", nargs="+",
-                        help="Locations (URL or local filepath) of files.")
+    group.add_argument(
+        "-o",
+        "--outfiles",
+        action="store_true",
+        help="Store results in files with same name but '.txt'.",
+    )
+    group.add_argument(
+        "-c", "--clipboard", action="store_true", help="Copy result to the clipboard."
+    )
+    parser.add_argument(
+        "--markdown",
+        action="store_true",
+        help="Extract Markdown instead of plain text from text file.",
+    )
+    parser.add_argument(
+        "-l",
+        "--languages",
+        default="sv en",
+        help="String containing languages to use for OCR.",
+    )
+    parser.add_argument(
+        "--gpu", action="store_true", help="Use GPU if present for OCR."
+    )
+    parser.add_argument(
+        "--apikey", default=os.environ.get("APIKEY"), help="API key to use for URLs."
+    )
+    parser.add_argument(
+        "locations", nargs="+", help="Locations (URL or local filepath) of files."
+    )
     args = parser.parse_args()
     main(**vars(args))
