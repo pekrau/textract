@@ -4,7 +4,7 @@ textract
 Simple extraction of text from image (PNG, JPEG, WEBP, GIF) or
 text (PDF, DOCX, EPUB) files or web resources.
 
-´´´
+```
 usage: textract [-h] [-o | -c] [-l LANGUAGES] [-g] [-a APIKEY] locations [locations ...]
 
 Extract text from image or text files.
@@ -21,7 +21,7 @@ options:
   -g, --gpu             Use GPU if present.
   -a APIKEY, --apikey APIKEY
                         API key to use for URLs.
-´´´
+```
 
 Packages used
 -------------
