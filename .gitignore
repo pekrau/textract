@@ -1,0 +1,5 @@
+.env
+.sesskey
+.project
+*~
+__pycache__
